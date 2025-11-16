@@ -86,37 +86,26 @@ function handleTeacherLogin() {
     const email = document.getElementById('teacher-email').value;
     const password = document.getElementById('teacher-password').value;
     
-    console.log('Attempting teacher login:', { email, password });
-    
-    // Check if function exists
-    if (typeof getTeacherByEmail !== 'function') {
-        console.error('getTeacherByEmail function not found');
-        alert('System error: Demo data not loaded. Please refresh the page.');
+    console.log('Attempting teacher login:', { email });
+    if (!email || !password) {
+        speak('Please enter email and password.');
+        alert('Please enter email and password.');
         return;
     }
-    
-    // Check against demo data
-    const teacher = getTeacherByEmail(email);
-    console.log('Found teacher:', teacher);
-    
-    if (teacher && teacher.password === password) {
-        currentUser = { 
-            type: 'teacher', 
-            id: teacher.id,
-            email: teacher.email,
-            name: teacher.name,
-            department: teacher.department
-        };
-        storeUserData(currentUser);
-        speak('Login successful. Redirecting to teacher dashboard.');
-        setTimeout(() => {
-            window.location.href = 'teacher-dashboard.html';
-        }, 2000);
-    } else {
-        console.log('Login failed - teacher not found or wrong password');
-        speak('Invalid email or password. Please try again.');
-        alert('Invalid email or password. Please try again.\n\nDemo credentials:\nEmail: teacher1@autoscribe.edu\nPassword: teacher123');
-    }
+    // Accept any non-empty credentials and create a basic teacher profile
+    const nameGuess = email.split('@')[0].replace(/\W+/g, ' ').trim() || 'Teacher';
+    currentUser = {
+        type: 'teacher',
+        id: 'T_' + btoa(email).replace(/=+/g, ''),
+        email: email,
+        name: nameGuess.charAt(0).toUpperCase() + nameGuess.slice(1),
+        department: ''
+    };
+    storeUserData(currentUser);
+    speak('Login successful. Redirecting to teacher dashboard.');
+    setTimeout(() => {
+        window.location.href = 'teacher-dashboard.html';
+    }, 800);
 }
 
 // Handle student login
@@ -125,38 +114,25 @@ function handleStudentLogin() {
     const password = document.getElementById('student-password').value;
     const language = document.getElementById('language-select').value;
     
-    console.log('Attempting student login:', { studentId, password, language });
-    
-    // Check if function exists
-    if (typeof getStudentById !== 'function') {
-        console.error('getStudentById function not found');
-        alert('System error: Demo data not loaded. Please refresh the page.');
+    console.log('Attempting student login:', { studentId, language });
+    if (!studentId || !password) {
+        speak('Please enter student ID and password.');
+        alert('Please enter student ID and password.');
         return;
     }
-    
-    // Check against demo data
-    const student = getStudentById(studentId);
-    console.log('Found student:', student);
-    
-    if (student && student.password === password) {
-        currentUser = { 
-            type: 'student', 
-            id: student.id,
-            name: student.name,
-            email: student.email,
-            class: student.class,
-            language: language 
-        };
-        storeUserData(currentUser);
-        speak('Login successful. Redirecting to student dashboard.');
-        setTimeout(() => {
-            window.location.href = 'student-dashboard.html';
-        }, 2000);
-    } else {
-        console.log('Login failed - student not found or wrong password');
-        speak('Invalid student ID or password. Please try again.');
-        alert('Invalid student ID or password. Please try again.\n\nDemo credentials:\nStudent ID: STU001\nPassword: student123');
-    }
+    currentUser = {
+        type: 'student',
+        id: studentId,
+        name: 'Student ' + studentId,
+        email: '',
+        class: '',
+        language: language
+    };
+    storeUserData(currentUser);
+    speak('Login successful. Redirecting to student dashboard.');
+    setTimeout(() => {
+        window.location.href = 'student-dashboard.html';
+    }, 800);
 }
 
 

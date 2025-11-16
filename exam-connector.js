@@ -33,12 +33,10 @@ function saveExamToStorage(exam) {
 function getAllExamsFromStorage() {
     try {
         const storedExams = JSON.parse(localStorage.getItem(STORAGE_KEYS.EXAMS)) || [];
-        // Combine with demo exams
-        const allExams = [...demoExams, ...storedExams];
-        return allExams;
+        return storedExams;
     } catch (error) {
         console.error('Error loading exams:', error);
-        return demoExams;
+        return [];
     }
 }
 
@@ -264,11 +262,11 @@ function loadExamQuestion(index) {
     const progress = ((index + 1) / exam.questions.length) * 100;
     document.getElementById('exam-progress').style.width = `${progress}%`;
 
-    // Load options
+    // Load options or free-text input
     const optionsContainer = document.getElementById('options-container');
     optionsContainer.innerHTML = '';
 
-    if (question.options) {
+    if (question.options && question.options.length) {
         question.options.forEach((option, idx) => {
             const optionDiv = document.createElement('div');
             optionDiv.className = 'option';
@@ -287,25 +285,39 @@ function loadExamQuestion(index) {
 
             optionsContainer.appendChild(optionDiv);
         });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.id = 'free-text-answer';
+        ta.rows = 4;
+        ta.placeholder = 'Type your answer here...';
+        ta.style.width = '100%';
+        ta.value = (window.currentExamState.answers[question.id] || '');
+        ta.addEventListener('input', () => {
+            window.currentExamState.answers[question.id] = ta.value;
+        });
+        optionsContainer.appendChild(ta);
     }
 
-    // Update navigation buttons
-    document.getElementById('prev-btn').disabled = index === 0;
-    const nextBtn = document.getElementById('next-btn');
-    if (index === exam.questions.length - 1) {
-        nextBtn.innerHTML = '<i class="fas fa-check"></i> Submit';
-    } else {
-        nextBtn.innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
-    }
+    // Update navigation buttons (handle potential duplicate IDs on page)
+    document.querySelectorAll('#prev-btn').forEach(btn => { btn.disabled = index === 0; });
+    document.querySelectorAll('#next-btn').forEach(btn => {
+        if (index === exam.questions.length - 1) {
+            btn.innerHTML = '<i class="fas fa-check"></i> Submit';
+        } else {
+            btn.innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
+        }
+    });
 
     // Speak question using multilingual system
+    // Cancel any ongoing speech to avoid overlap with other modules
+    if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} }
     if (window.speak && window.formatMessage) {
         let questionText = window.formatMessage('questionPrefix', {
             number: index + 1,
             total: exam.questions.length
         }) + ' ' + question.text + '. ';
         
-        if (question.options) {
+        if (question.options && question.options.length) {
             questionText += window.formatMessage('optionsPrefix', {}) + ' ';
             question.options.forEach((option, idx) => {
                 questionText += window.formatMessage('optionFormat', {
@@ -317,7 +329,7 @@ function loadExamQuestion(index) {
         window.speak(questionText);
     } else if (window.speechSynthesis) {
         let questionText = `Question ${index + 1}. ${question.text}. `;
-        if (question.options) {
+        if (question.options && question.options.length) {
             questionText += 'The options are: ';
             question.options.forEach((option, idx) => {
                 questionText += `Option ${String.fromCharCode(65 + idx)}, ${option}. `;

@@ -22,6 +22,191 @@ document.addEventListener('DOMContentLoaded', function() {
     loadScheduledExams();
     setupFileUpload();
     setupTTSControls();
+    // Configure PDF.js worker if available
+    if (window['pdfjsLib']) {
+        try {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.worker.min.js';
+        } catch (e) {}
+
+// OCR fallback: rasterize each PDF page and run Tesseract
+async function ocrExtractTextFromPDF(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            const dataUrl = canvas.toDataURL('image/png');
+            const result = await Tesseract.recognize(dataUrl, 'eng', { logger: m => (m.status==='recognizing text'?console.log(`OCR ${p}/${pdf.numPages}: ${Math.round((m.progress||0)*100)}%`):null) });
+            fullText += '\n' + (result.data && result.data.text ? result.data.text : '');
+        }
+        return fullText;
+    } catch (err) {
+        console.error('OCR fallback failed:', err);
+        return '';
+    }
+}
+
+// Load parsed questions into the Create Exam builder for manual edits
+function loadParsedIntoBuilder(meta, parsedQuestions) {
+    // Switch to Create section
+    showSection('create');
+    // Reset current created exam
+    createdExam = {
+        name: meta.name || '',
+        duration: parseInt(meta.duration) || 60,
+        description: meta.description || '',
+        difficulty: meta.difficulty || 'Medium',
+        type: 'Mixed',
+        questions: []
+    };
+    questionCounter = 0;
+
+    // Map parsed questions into builder format
+    createdExam.questions = parsedQuestions.map((pq, idx) => ({
+        id: `question_${idx+1}`,
+        text: pq.text || '',
+        options: Array.isArray(pq.options) && pq.options.length ? pq.options.slice(0,4).concat(Array(4).fill('')).slice(0,4) : [],
+        correct: (typeof pq.correct === 'number' ? pq.correct : 0)
+    }));
+
+    // Render into UI
+    loadCreateExam();
+}
+
+// Show preview modal for parsed questions before saving
+function showParsedPreview(meta, parsedQuestions) {
+    // Build modal elements
+    const overlay = document.createElement('div');
+    overlay.id = 'preview-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.55)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '10000';
+
+    const modal = document.createElement('div');
+    modal.style.background = '#fff';
+    modal.style.width = 'min(900px, 92vw)';
+    modal.style.maxHeight = '84vh';
+    modal.style.borderRadius = '10px';
+    modal.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+
+    const header = document.createElement('div');
+    header.style.padding = '16px 20px';
+    header.style.borderBottom = '1px solid #e5e7eb';
+    header.innerHTML = `<h3 style="margin:0">Preview Parsed Questions (${parsedQuestions.length})</h3>
+        <p style="margin:6px 0 0;color:#6b7280;font-size:14px">${escapeHtml(meta.name)} • ${escapeHtml(meta.subject)} • ${escapeHtml(meta.duration)} mins</p>`;
+
+    const body = document.createElement('div');
+    body.style.padding = '12px 20px';
+    body.style.overflow = 'auto';
+    body.style.flex = '1';
+
+    const list = document.createElement('div');
+    parsedQuestions.forEach((q, idx) => {
+        const item = document.createElement('div');
+        item.style.border = '1px solid #e5e7eb';
+        item.style.borderRadius = '8px';
+        item.style.padding = '12px';
+        item.style.marginBottom = '10px';
+        const title = `Q${idx+1}. ${escapeHtml(q.text)}`;
+        let html = `<div style="font-weight:600;margin-bottom:6px">${title}</div>`;
+        if (q.options && q.options.length) {
+            html += '<ol type="A" style="margin:0 0 4px 18px">' + q.options.map(o=>`<li>${escapeHtml(o)}</li>`).join('') + '</ol>';
+        }
+        html += `<div style="color:#6b7280;font-size:12px">marks: ${q.marks||2}${typeof q.correct==='number'?' • correct stored':''}</div>`;
+        item.innerHTML = html;
+        list.appendChild(item);
+    });
+    body.appendChild(list);
+
+    const footer = document.createElement('div');
+    footer.style.display = 'flex';
+    footer.style.justifyContent = 'flex-end';
+    footer.style.gap = '10px';
+    footer.style.padding = '12px 20px';
+    footer.style.borderTop = '1px solid #e5e7eb';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.className = 'btn btn-outline';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = 'Confirm & Save';
+    confirmBtn.className = 'btn btn-primary';
+    confirmBtn.onclick = () => {
+        // Build and save exam
+        const exam = {
+            id: 'EXAM' + Date.now(),
+            name: meta.name,
+            teacherId: getUserData().id,
+            date: meta.date,
+            duration: parseInt(meta.duration),
+            subject: meta.subject,
+            description: meta.description,
+            difficulty: meta.difficulty,
+            status: 'available',
+            questions: parsedQuestions.map((q, idx) => ({
+                id: idx + 1,
+                text: q.text,
+                options: q.options && q.options.length ? q.options : undefined,
+                correct: (typeof q.correct === 'number' ? q.correct : undefined),
+                marks: q.marks || 2
+            })),
+            createdAt: new Date(),
+            scheduledStart: null,
+            scheduledEnd: null
+        };
+        if (saveExamToStorage(exam)) {
+            document.body.removeChild(overlay);
+            alert('Exam parsed and saved successfully!');
+            resetUploadForm();
+            loadExams();
+            updateExamSelects();
+        } else {
+            alert('Error saving exam. Please try again.');
+        }
+    };
+
+    footer.appendChild(cancelBtn);
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit in Builder';
+    editBtn.className = 'btn btn-secondary';
+    editBtn.onclick = () => {
+        document.body.removeChild(overlay);
+        loadParsedIntoBuilder(meta, parsedQuestions);
+    };
+    footer.appendChild(editBtn);
+    footer.appendChild(confirmBtn);
+
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+}
+
+function escapeHtml(s){
+    return String(s||'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+}
+    }
 });
 
 // Setup event listeners
@@ -54,8 +239,13 @@ function showSection(sectionName) {
     // Show selected section
     document.getElementById(`${sectionName}-section`).classList.add('active');
     
-    // Add active class to clicked nav button
-    event.target.classList.add('active');
+    // Add active class to clicked nav button (guard if called programmatically)
+    if (typeof event !== 'undefined' && event && event.target) {
+        event.target.classList.add('active');
+    } else {
+        const btn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.textContent.toLowerCase().includes(sectionName));
+        if (btn) btn.classList.add('active');
+    }
     
     currentSection = sectionName;
     
@@ -537,11 +727,11 @@ function saveCreatedExam() {
             alert(`Please enter text for question ${i + 1}.`);
             return;
         }
-        
-        const hasOptions = question.options.some(option => option.trim() !== '');
-        if (!hasOptions) {
-            alert(`Please add options for question ${i + 1}.`);
-            return;
+        // Allow short-answer questions without options
+        const hasAnyOption = Array.isArray(question.options) && question.options.some(option => (option || '').trim() !== '');
+        if (!hasAnyOption) {
+            // normalize to empty array for short-answer
+            question.options = [];
         }
     }
     
@@ -866,32 +1056,181 @@ function uploadExam() {
         return;
     }
     
-    // Create exam object (simplified - in real app would parse PDF)
-    const exam = {
-        id: 'EXAM' + Date.now(),
-        name: name,
-        teacherId: getUserData().id,
-        date: date,
-        duration: parseInt(duration),
-        subject: subject,
-        description: description,
-        difficulty: difficulty,
-        status: 'available',
-        questions: [], // Would be populated from PDF parsing
-        createdAt: new Date(),
-        scheduledStart: null,
-        scheduledEnd: null
-    };
-    
-    // Save to storage
-    if (saveExamToStorage(exam)) {
-        alert('Exam uploaded successfully!');
-        resetUploadForm();
-        loadExams();
-        loadDashboardData();
-    } else {
-        alert('Error uploading exam.');
+    // Parse PDF to questions then show preview before save
+    const pdfFile = fileInput.files[0];
+    parsePdfToQuestions(pdfFile).then((questions) => {
+        if (!questions || questions.length === 0) {
+            alert('Could not detect questions in the PDF. Please ensure they are numbered like 1), 2., 3 -');
+            return;
+        }
+        try {
+            if (typeof window.showParsedPreview === 'function') {
+                window.showParsedPreview({ name, date, duration, subject, description, difficulty }, questions);
+            } else if (typeof showParsedPreview === 'function') {
+                showParsedPreview({ name, date, duration, subject, description, difficulty }, questions);
+            } else {
+                // Fallback: direct save
+                const exam = {
+                    id: 'EXAM' + Date.now(),
+                    name,
+                    teacherId: getUserData().id,
+                    date,
+                    duration: parseInt(duration),
+                    subject,
+                    description,
+                    difficulty,
+                    status: 'available',
+                    questions: questions.map((q, idx) => ({
+                        id: idx + 1,
+                        text: q.text,
+                        options: q.options && q.options.length ? q.options : undefined,
+                        correct: (typeof q.correct === 'number' ? q.correct : undefined),
+                        marks: q.marks || 2
+                    })),
+                    createdAt: new Date(),
+                    scheduledStart: null,
+                    scheduledEnd: null
+                };
+                if (saveExamToStorage(exam)) {
+                    alert('Exam parsed and saved successfully!');
+                    resetUploadForm();
+                    loadExams();
+                    updateExamSelects();
+                } else {
+                    alert('Error saving exam. Please try again.');
+                }
+            }
+        } catch (err) {
+            console.error('Error during preview/save:', err);
+            alert('Failed to open preview. Please try again.');
+        }
+    }).catch((err) => {
+        console.error('PDF parse error:', err);
+        alert('Failed to read the PDF. Please try a different file.');
+    });
+}
+
+// Ensure preview helpers exist in global scope
+if (typeof window.showParsedPreview !== 'function' && typeof showParsedPreview === 'function') {
+    window.showParsedPreview = showParsedPreview;
+}
+if (typeof window.loadParsedIntoBuilder !== 'function' && typeof loadParsedIntoBuilder === 'function') {
+    window.loadParsedIntoBuilder = loadParsedIntoBuilder;
+}
+if (typeof window.escapeHtml !== 'function' && typeof escapeHtml === 'function') {
+    window.escapeHtml = escapeHtml;
+}
+
+// Helpers: parse PDF to text and extract questions
+async function parsePdfToQuestions(file) {
+    if (!window['pdfjsLib']) {
+        throw new Error('PDF.js not available');
     }
+    try {
+        const text = await extractTextFromPDF(file);
+        if (!text || text.replace(/\s+/g,'').length < 20) {
+            throw new Error('No selectable text found. This PDF may be scanned (image-based).');
+        }
+        return parseQuestionsFromText(text);
+    } catch (e) {
+        // Re-throw with clearer context
+        if (e && /Password|encrypted/i.test(String(e.message))) {
+            throw new Error('This PDF is password-protected. Please provide an unprotected PDF.');
+        }
+        // OCR fallback if available
+        if (window.Tesseract) {
+            console.warn('Falling back to OCR via Tesseract.js');
+            const ocrText = await ocrExtractTextFromPDF(file);
+            if (ocrText && ocrText.replace(/\s+/g,'').length >= 20) {
+                return parseQuestionsFromText(ocrText);
+            }
+        }
+        throw e;
+    }
+}
+
+async function extractTextFromPDF(file){
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableRange: true }).promise;
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent({ normalizeWhitespace: true });
+        const strings = content.items.map(i => i.str);
+        fullText += '\n' + strings.join(' ');
+    }
+    return fullText;
+}
+
+function parseQuestionsFromText(text){
+    const cleaned = text
+      .replace(/\r/g,'')
+      .replace(/\t/g,' ')
+      .replace(/\u00a0/g,' ')
+      .replace(/\s{2,}/g,' ');
+
+    const twoMarkHeaderRegex = /\b(\d+)\s*mark\b/i;
+    const anchors = [...cleaned.matchAll(/(?:^|\s)(\d{1,3})\s*[\)\.\-]\s+/g)];
+    const questionsList = [];
+
+    if (anchors.length === 0) {
+        return questionsList; // nothing detected
+    }
+
+    for (let i = 0; i < anchors.length; i++) {
+        const startIdx = anchors[i].index + anchors[i][0].match(/\s*$/).index; // after leading spaces
+        const endIdx = (i < anchors.length - 1) ? anchors[i+1].index : cleaned.length;
+        let chunk = cleaned.slice(startIdx, endIdx).trim();
+        if (!chunk) continue;
+
+        // Strip trailing answer fragments within chunk
+        chunk = chunk.replace(/\b(?:answer|ans|correct)\s*[:\-]?\s*([A-Da-d]|[1-4])[^]*$/i, '').trim();
+
+        // Determine marks based on nearest preceding header
+        const headerWindowStart = Math.max(0, startIdx - 200);
+        const headerWindow = cleaned.slice(headerWindowStart, startIdx);
+        let inferredMarks = 0;
+        const hdrMatch = headerWindow.match(twoMarkHeaderRegex);
+        if (hdrMatch) {
+            inferredMarks = parseInt(hdrMatch[1], 10);
+        }
+
+        // Extract options (A/a..D/d) inline
+        let options = [];
+        let questionText = chunk;
+        const firstOpt = chunk.match(/[A-Da-d]\s*[\)\.-]\s+/);
+        if (firstOpt && typeof firstOpt.index === 'number') {
+            questionText = chunk.slice(0, firstOpt.index).trim();
+            const optSegment = chunk.slice(firstOpt.index).trim();
+            const optionRegex = /(?:^|\s)([A-Da-d])\s*[\)\.-]\s+(.+?)(?=(?:\s[A-Da-d]\s*[\)\.-]\s+)|$)/g;
+            let m;
+            while ((m = optionRegex.exec(optSegment)) !== null) {
+                const textPart = (m[2] || '').trim();
+                if (textPart) options.push(textPart);
+            }
+        }
+
+        // Detect inline correct key earlier, but after option extraction also try again
+        let correctIndex;
+        const ansMatch = chunk.match(/\b(?:answer|ans|correct)\s*[:\-]?\s*([A-Da-d]|[1-4])\b/i);
+        if (ansMatch) {
+            const token = ansMatch[1].toUpperCase();
+            if (/[A-D]/.test(token)) correctIndex = token.charCodeAt(0) - 65;
+            if (/[1-4]/.test(token)) correctIndex = parseInt(token, 10) - 1;
+        }
+
+        if (questionText) {
+            const isMcq = options.length >= 2;
+            let marks = isMcq ? 1 : 2;
+            if (inferredMarks > 0) marks = inferredMarks;
+            const q = { text: questionText, marks };
+            if (isMcq) q.options = options;
+            if (typeof correctIndex === 'number') q.correct = correctIndex;
+            questionsList.push(q);
+        }
+    }
+
+    return questionsList;
 }
 
 // Reset upload form
@@ -913,7 +1252,7 @@ function deleteExam(examId) {
     if (confirm('Are you sure you want to delete this exam?')) {
         const allExams = getAllExamsFromStorage();
         const updatedExams = allExams.filter(e => e.id !== examId);
-        localStorage.setItem('autoscribe_exams', JSON.stringify(updatedExams.filter(e => !demoExams.find(de => de.id === e.id))));
+        localStorage.setItem('autoscribe_exams', JSON.stringify(updatedExams));
         loadExams();
         loadDashboardData();
         alert('Exam deleted successfully!');
