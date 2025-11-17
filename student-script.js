@@ -60,49 +60,27 @@ function loadMockExams() {
     const mockExamList = document.getElementById('mockExamList');
     if (!mockExamList) return;
 
-    // Example mock exams array if not defined
-    if (typeof MOCK_EXAMS === 'undefined') {
-        window.MOCK_EXAMS = [
-            {
-                id: 'mock1',
-                title: 'Math Practice Exam',
-                subject: 'Mathematics',
-                duration: 5, // minutes
-                questions: [
-                    { id: 'q1', text: 'What is 2 + 2?', type: 'mcq', options: ['3', '4', '5', '6'], correctAnswer: 'B', marks: 2 }
-                ]
-            }
-        ];
-    }
-
-    mockExamList.innerHTML = MOCK_EXAMS.map(exam => `
-        <div class="mock-exam-card">
-            <h3>${exam.title} <span class="practice-badge">Practice</span></h3>
-            <div class="mock-exam-meta">
-                <span><i class="fas fa-book"></i> ${exam.subject}</span>
-                <span><i class="far fa-clock"></i> ${exam.duration} min</span>
-                <span><i class="fas fa-question-circle"></i> ${exam.questions.length} questions</span>
-            </div>
-            <p>Practice with this ${exam.subject} exam to test your knowledge.</p>
-            <button class="btn btn-outline" onclick="startMockExamFromList('${exam.id}')">
-                <i class="fas fa-play"></i> Start Practice
+    // Always initialize with empty array
+    window.MOCK_EXAMS = [];
+    
+    // Show empty state since we're not loading any default exams
+    mockExamList.innerHTML = `
+        <div class="no-mock-exams">
+            <i class="fas fa-book-open"></i>
+            <h3>No Mock Exams Available</h3>
+            <p>Please upload mock exam question papers to get started with practice tests.</p>
+            <button class="btn btn-primary" onclick="alert('Upload functionality will be implemented here')">
+                <i class="fas fa-upload"></i> Upload Mock Exam
             </button>
         </div>
-    `).join('');
+    `;
 }
 
-// Start mock exam (OLD VERSION - RENAMED TO AVOID CONFLICT WITH ENHANCED VERSION)
+// Start mock exam
 function startMockExamFromList(examId) {
-    const exam = MOCK_EXAMS.find(e => e.id === examId);
-    if (!exam) return;
-
-    currentExam = { ...exam, isMock: true };
-    currentQuestionIndex = 0;
-    answers = {};
-
-    // Show exam section, hide dashboard
-    document.getElementById('dashboard-section').classList.remove('active');
-    document.getElementById('exam-section').classList.add('active');
+    // No default exams available
+    alert('No mock exams available. Please upload exam content first.');
+    return;
 
     // Update exam title and meta
     document.getElementById('exam-title').textContent = exam.title + ' (Practice)';
@@ -286,16 +264,112 @@ function showHelp() {
 
 // Load available exams
 function loadAvailableExams() {
-    // This will be handled by exam-connector.js
-    if (window.loadStudentExams) {
-        window.loadStudentExams();
+    const examsList = document.getElementById('examsList');
+    if (!examsList) return;
+
+    // Pull exams via exam-connector (teacher saved under autoscribe_exams)
+    let exams = [];
+    try {
+        exams = (typeof window.getAvailableExamsForStudent === 'function')
+            ? window.getAvailableExamsForStudent()
+            : (JSON.parse(localStorage.getItem('autoscribe_exams')) || []);
+    } catch (_) {
+        exams = JSON.parse(localStorage.getItem('autoscribe_exams')) || [];
     }
+
+    if (!exams.length) {
+        examsList.innerHTML = '<div class="no-exams">No exams available at the moment.</div>';
+        return;
+    }
+
+    // If teacher did not set time window, fall back to status filter
+    const now = new Date();
+    const availableExams = exams.filter(exam => {
+        if (exam.startTime && exam.endTime) {
+            const start = new Date(exam.startTime);
+            const end = new Date(exam.endTime);
+            return now >= start && now <= end;
+        }
+        return exam.status === 'available' || exam.status === 'scheduled';
+    });
+
+    if (!availableExams.length) {
+        examsList.innerHTML = '<div class="no-exams">No active exams at the moment. Please check back later.</div>';
+        return;
+    }
+
+    examsList.innerHTML = availableExams.map(exam => `
+        <div class="exam-card">
+            <div class="exam-header">
+                <h3>${exam.name}</h3>
+                <span class="exam-subject">${exam.subject || 'General'}</span>
+            </div>
+            <div class="exam-details">
+                <p><i class="far fa-clock"></i> Duration: ${exam.duration} minutes</p>
+                ${exam.endTime ? `<p><i class=\"far fa-calendar-alt\"></i> Available until: ${new Date(exam.endTime).toLocaleString()}</p>` : ''}
+            </div>
+            <div class="exam-actions">
+                <button class="btn btn-primary" onclick="startExamById('${exam.id}')">
+                    <i class="fas fa-play"></i> Start Exam
+                </button>
+            </div>
+        </div>
+    `).join('');
 }
 
 // Load submissions
 function loadSubmissions() {
     // This will be handled by exam-connector.js
     console.log('Loading student submissions...');
+}
+
+// Start exam
+function startExam(examId) {
+    // Get the exam from localStorage
+    const exams = JSON.parse(localStorage.getItem('exams')) || [];
+    const exam = exams.find(e => e.id === examId);
+    
+    if (!exam) {
+        alert('Exam not found. Please try again.');
+        return;
+    }
+    
+    // Set current exam
+    currentExam = {
+        ...exam,
+        isMock: false,
+        startTime: new Date().toISOString()
+    };
+    
+    // Initialize answers
+    answers = {};
+    currentQuestionIndex = 0;
+    // Bridge: also initialize enhanced state so global nextQuestion()/previousQuestion() work
+    try {
+        window.currentExamState = {
+            exam: { ...currentExam },
+            currentQuestionIndex: 0,
+            answers: {},
+            answersArray: new Array((currentExam.questions || []).length).fill(null),
+            startTime: new Date(),
+            timeLimit: (currentExam.duration || 0) * 60
+        };
+    } catch(e) { /* no-op */ }
+    
+    // Show exam section
+    document.getElementById('dashboard-section').classList.remove('active');
+    document.getElementById('exam-section').classList.add('active');
+    
+    // Update exam info
+    document.getElementById('exam-title').textContent = exam.name;
+    document.getElementById('exam-subject').textContent = exam.subject || 'General';
+    document.getElementById('exam-duration').textContent = `${exam.duration} minutes`;
+    
+    // Show first question
+    showQuestion(0);
+    
+    // Start timer
+    startExamTimer(exam.duration * 60); // Convert minutes to seconds
 }
 
 // Export functions globally

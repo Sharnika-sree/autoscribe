@@ -115,6 +115,9 @@ let currentLanguage = 'en';
 let recognition = null;
 let synthesis = window.speechSynthesis;
 let isVoiceEnabled = false;
+let isSpeakingNow = false; // prevent recognition from hearing our own TTS
+// Auto-reading enabled by default; no explicit 'start' needed
+window.voiceReadingActive = (typeof window.voiceReadingActive === 'boolean') ? window.voiceReadingActive : true;
 
 // Initialize multilingual voice system
 function initMultilingualVoice(language = 'en') {
@@ -141,8 +144,8 @@ function initMultilingualVoice(language = 'en') {
         };
         
         recognition.onend = function() {
-            if (isVoiceEnabled) {
-                // Restart recognition if voice mode is still enabled
+            // Only auto-restart if not currently speaking via TTS
+            if (isVoiceEnabled && !isSpeakingNow) {
                 try {
                     recognition.start();
                 } catch (e) {
@@ -186,19 +189,32 @@ function changeExamLanguage(language) {
 // Speak text in current language
 function speak(text, callback) {
     if (synthesis.speaking) {
-        synthesis.cancel();
+        try { synthesis.cancel(); } catch(e) {}
     }
-    
+
+    // Pause recognition while TTS is speaking to avoid echoing commands
+    const shouldManageRecognition = !!(recognition && isVoiceEnabled);
+    if (shouldManageRecognition) {
+        isSpeakingNow = true;
+        try { recognition.stop(); } catch(e) {}
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = LANGUAGES[currentLanguage].code;
     utterance.rate = 0.9;
     utterance.pitch = 1;
     utterance.volume = 1;
-    
-    if (callback) {
-        utterance.onend = callback;
-    }
-    
+
+    const userCallback = typeof callback === 'function' ? callback : null;
+    utterance.onend = () => {
+        // Resume recognition if voice mode is enabled
+        if (shouldManageRecognition) {
+            isSpeakingNow = false;
+            try { recognition.start(); } catch(e) {}
+        }
+        if (userCallback) userCallback();
+    };
+
     synthesis.speak(utterance);
 }
 
@@ -238,6 +254,19 @@ function handleMultilingualVoiceCommand(transcript) {
 function executeCommand(commandType, transcript) {
     switch (commandType) {
         case 'start':
+            // If an exam is already active, enable reading and read current question + options
+            try {
+                const examSection = document.getElementById('exam-section');
+                const mockInterface = document.getElementById('mock-exam-interface');
+                const inRealExam = !!(examSection && examSection.classList.contains('active'));
+                const inMockExam = !!(mockInterface && (mockInterface.style.display === 'block' || mockInterface.classList.contains('active')));
+                if (inRealExam || inMockExam || (window.currentExamState && window.currentExamState.exam)) {
+                    window.voiceReadingActive = true;
+                    readQuestionAndOptions();
+                    break;
+                }
+            } catch (e) {}
+            // Otherwise, start an exam if available
             if (typeof startExam === 'function') {
                 startExam();
             } else if (typeof startMockExam === 'function') {
@@ -260,7 +289,7 @@ function executeCommand(commandType, transcript) {
             break;
             
         case 'read':
-            readCurrentQuestion();
+            readQuestionAndOptions();
             break;
             
         case 'readOptions':
@@ -284,15 +313,7 @@ function executeCommand(commandType, transcript) {
             break;
             
         case 'submit':
-            if (confirm(LANGUAGES[currentLanguage].messages.submitConfirm)) {
-                if (typeof submitExam === 'function') {
-                    submitExam();
-                } else if (typeof submitMockExam === 'function') {
-                    submitMockExam();
-                } else if (typeof submitCurrentExam === 'function') {
-                    submitCurrentExam();
-                }
-            }
+            
             break;
             
         case 'help':
@@ -302,7 +323,7 @@ function executeCommand(commandType, transcript) {
 }
 
 // Read current question
-function readCurrentQuestion() {
+function readCurrentQuestion(callback) {
     const questionText = document.getElementById('question-text') || 
                         document.getElementById('mock-question-text');
     const questionNumber = document.getElementById('question-number') || 
@@ -315,7 +336,7 @@ function readCurrentQuestion() {
             number: questionNumber.textContent,
             total: totalQuestions.textContent
         }) + ' ' + questionText.textContent;
-        speak(message);
+        speak(message, callback);
     }
 }
 
@@ -339,13 +360,21 @@ function readCurrentOptions() {
     }
 }
 
+// Read question followed by options
+function readQuestionAndOptions() {
+    readCurrentQuestion(() => {
+        // slight delay to ensure clear separation
+        try { setTimeout(readCurrentOptions, 50); } catch (e) { readCurrentOptions(); }
+    });
+}
+
 // Select option by voice
 function selectOptionByVoice(index) {
     // Try different selection functions
-    if (typeof selectOption === 'function') {
-        selectOption(index);
-    } else if (typeof selectExamOption === 'function') {
+    if (typeof selectExamOption === 'function') {
         selectExamOption(index);
+    } else if (typeof selectOption === 'function') {
+        selectOption(index);
     }
     
     // Speak confirmation

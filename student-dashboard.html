@@ -52,7 +52,7 @@
 
         <main class="main-content">
             <!-- Dashboard Section -->
-            <section id="dashboard-section" class="content-section" style="display: none;">
+            <section id="dashboard-section" class="content-section active">
                 <h2>Your Dashboard</h2>
                 <div class="dashboard-grid">
                     <div class="dashboard-card current-exams">
@@ -135,7 +135,7 @@
             </section>
 
             <!-- Exam Section -->
-            <section id="exam-section" class="content-section" style="display: block;">
+            <section id="exam-section" class="content-section">
                 <div class="exam-header">
                     <div class="exam-title-container">
                         <h2 id="exam-title">Exam in Progress</h2>
@@ -386,120 +386,27 @@
         </main>
     </div>
 
+    <!-- Auto-login script for direct access (bypasses login requirement) -->
     <script>
-        // Function to show the exam section
-        function showExamSection() {
-            try {
-                // Hide all sections
-                const sections = document.querySelectorAll('.content-section');
-                sections.forEach(section => {
-                    section.style.display = 'none';
-                    section.classList.remove('active');
-                });
-                
-                // Show the exam section
-                const examSection = document.getElementById('exam-section');
-                if (examSection) {
-                    examSection.style.display = 'block';
-                    examSection.classList.add('active');
-                    console.log('Exam section is now visible');
-                } else {
-                    console.error('Exam section element not found');
-                }
-                
-                // Also show the mock exam interface
-                const mockExam = document.getElementById('mock-exam-interface');
-                if (mockExam) {
-                    mockExam.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Error in showExamSection:', error);
-            }
+        // Create a fake student user in localStorage for testing
+        if (!localStorage.getItem('currentUser')) {
+            localStorage.setItem('currentUser', JSON.stringify({
+                id: 'STU001',
+                name: 'Test Student',
+                email: 'test@student.edu',
+                role: 'student',
+                class: 'Grade 10A'
+            }));
+            console.log('✅ Auto-logged in as Test Student for direct access');
         }
-        
-        // Check if user is logged in
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM fully loaded');
-            
-            // Check if student is logged in
-            const isLoggedIn = localStorage.getItem('studentLoggedIn') === 'true';
-            const studentId = localStorage.getItem('studentId');
-            
-            console.log('Login check - isLoggedIn:', isLoggedIn);
-            console.log('Login check - studentId:', studentId);
-            
-            if (!isLoggedIn || !studentId) {
-                console.log('User not logged in or missing student ID, redirecting to login...');
-                // Redirect to login if not logged in
-                window.location.href = 'login-student.html';
-                return;
-            }
-            
-            console.log('User is logged in, proceeding to dashboard...');
-            
-            try {
-                // Set the student ID in the header
-                const studentNameElement = document.getElementById('student-name');
-                if (studentNameElement) {
-                    studentNameElement.textContent = `Welcome, Student ${studentId}`;
-                    console.log('Updated welcome message with student ID');
-                } else {
-                    console.error('Student name element not found');
-                }
-                
-                // Load student data (in a real app, this would come from an API)
-                loadStudentData(studentId);
-                
-                // Show the exam section by default
-                showExamSection();
-                
-                console.log('Dashboard initialization complete');
-            } catch (error) {
-                console.error('Error initializing dashboard:', error);
-            }
-        });
-        
-        // Function to load student data
-        function loadStudentData(studentId) {
-            // In a real app, you would fetch this from your backend
-            const studentData = {
-                id: studentId,
-                name: `Student ${studentId}`,
-                email: `${studentId}@example.com`,
-                course: 'Computer Science'
-            };
-            
-            // Update the UI with student data
-            document.getElementById('student-name').textContent = `Welcome, ${studentData.name}`;
-            
-            // Store student data for later use
-            localStorage.setItem('studentData', JSON.stringify(studentData));
-        }
-        
-        // Logout function
-        function logout() {
-            // Clear login state
-            localStorage.removeItem('studentLoggedIn');
-            localStorage.removeItem('studentId');
-            localStorage.removeItem('studentData');
-            
-            // Redirect to login page
-            window.location.href = 'login-student.html';
-        }
-        
-        // Add logout button event listener
-        document.addEventListener('DOMContentLoaded', function() {
-            const logoutBtn = document.querySelector('.logout-btn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', logout);
-            }
-        });
     </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="exam-connector.js"></script>
     <script src="multilingual-voice.js"></script>
     <script src="script.js"></script>
     <script src="student-script.js"></script>
-    <script src="mock-exam.js"></script>
+    <!-- Removed legacy mock-exam.js to prevent duplicate globals and errors -->
     <script src="enhanced-mock-exam.js"></script>
 </body>
 </html>

@@ -1,41 +1,5 @@
-// Mock Exam Questions
-const mockExamQuestions = [
-    {
-        id: 1,
-        question: "What is the capital of France?",
-        options: ["London", "Berlin", "Paris", "Madrid"],
-        correctAnswer: 2,
-        marks: 2
-    },
-    {
-        id: 2,
-        question: "Which planet is known as the Red Planet?",
-        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-        correctAnswer: 1,
-        marks: 2
-    },
-    {
-        id: 3,
-        question: "What is 7 x 8?",
-        options: ["48", "56", "64", "72"],
-        correctAnswer: 1,
-        marks: 2
-    },
-    {
-        id: 4,
-        question: "Which element has the chemical symbol 'O'?",
-        options: ["Gold", "Oxygen", "Osmium", "Oganesson"],
-        correctAnswer: 1,
-        marks: 2
-    },
-    {
-        id: 5,
-        question: "Who painted the Mona Lisa?",
-        options: ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Michelangelo"],
-        correctAnswer: 2,
-        marks: 2
-    }
-];
+// Mock Exam Questions - Empty by default
+const mockExamQuestions = [];
 
 let currentQuestionIndex = 0;
 let userAnswers = new Array(mockExamQuestions.length).fill(null);
@@ -59,6 +23,10 @@ let currentPosition;
 
 // Initialize the exam
 function initMockExam() {
+    if (mockExamQuestions.length === 0) {
+        alert('No mock exam questions available. Please upload exam content first.');
+        return;
+    }
     totalQuestions.textContent = mockExamQuestions.length;
     displayQuestion(0);
     startTimer();
@@ -132,25 +100,32 @@ function endMockExamOld() {
 function submitMockExamOld() {
     clearInterval(examTimer);
     
+    if (mockExamQuestions.length === 0) {
+        alert('No exam data available.');
+        return;
+    }
+    
     // Calculate score
     let score = 0;
     let totalMarks = 0;
     
     userAnswers.forEach((answer, index) => {
-        if (answer === mockExamQuestions[index].correctAnswer) {
-            score += mockExamQuestions[index].marks;
+        if (mockExamQuestions[index]) {
+            if (answer === mockExamQuestions[index].correctAnswer) {
+                score += mockExamQuestions[index].marks || 0;
+            }
+            totalMarks += mockExamQuestions[index].marks || 0;
         }
-        totalMarks += mockExamQuestions[index].marks;
     });
     
-    const percentage = Math.round((score / totalMarks) * 100);
+    const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
     
     // Show results
     alert(`Exam submitted!\nYour score: ${score}/${totalMarks} (${percentage}%)`);
     
     // Reset and go back to exam list
-    mockExamInterface.style.display = 'none';
-    mockExamSection.style.display = 'block';
+    if (mockExamInterface) mockExamInterface.style.display = 'none';
+    if (mockExamSection) mockExamSection.style.display = 'block';
     resetExam();
 }
 
