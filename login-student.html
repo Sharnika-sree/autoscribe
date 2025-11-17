@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Login - Autoscribe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --primary-light: #818CF8;
+            --text-primary: #1F2937;
+            --text-secondary: #4B5563;
+            --bg-light: rgba(255, 255, 255, 0.95);
+            --border-color: #E5E7EB;
+        }
+        .auth-container {
+            max-width: 500px;
+            margin: 3rem auto;
+            padding: 2.5rem;
+            background: var(--bg-light);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .auth-header i {
+            font-size: 3.5rem;
+            color: var(--primary-color);
+            margin-bottom: 1.25rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-header h1 {
+            font-size: 2.25rem;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .auth-header p {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.75rem;
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 1rem 1.25rem 1rem 3rem;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s ease;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            z-index: 2;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+        
+        .toggle-password:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 6px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(79, 70, 229, 0.2);
+            background: linear-gradient(135deg, #4338CA, #6366F1);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(79, 70, 229, 0.2);
+        }
+
+        .forgot-password {
+            display: block;
+            text-align: right;
+            margin-top: 0.75rem;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+        }
+        
+        .forgot-password:hover {
+            color: #4338CA;
+            text-decoration: underline;
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+        
+        .auth-footer a {
+            color: var(--primary-color);
+            font-weight: 600;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        
+        .auth-footer a:hover {
+            color: #4338CA;
+            text-decoration: underline;
+        }
+
+        .back-to-home {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary-color);
+            text-decoration: none;
+            margin-bottom: 2rem;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+        
+        .back-to-home:hover {
+            background: rgba(79, 70, 229, 0.1);
+            transform: translateX(-5px);
+        }
+        
+        @media (max-width: 640px) {
+            .auth-container {
+                margin: 1.5rem;
+                padding: 2rem 1.5rem;
+            }
+            
+            .auth-header h1 {
+                font-size: 2rem;
+            }
+            
+            .auth-header p {
+                font-size: 1rem;
+            }
+            
+            .input-group input {
+                font-size: 1rem;
+                padding: 0.875rem 1rem 0.875rem 2.75rem;
+            }
+            
+            .btn {
+                padding: 0.875rem 1.5rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="auth-container">
+            <a href="index.html" class="back-to-home">
+                <i class="fas fa-arrow-left"></i>
+                Back to Home
+            </a>
+            
+            <div class="auth-header">
+                <i class="fas fa-user-graduate"></i>
+                <h1>Student Login</h1>
+                <p>Sign in to access your student dashboard</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="studentId" name="studentId" placeholder="Student ID" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="input-group">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="Password" required>
+                        <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                            <i class="far fa-eye"></i>
+                        </button>
+                    </div>
+                    <a href="forgot-password.html" class="forgot-password">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn">Sign In</button>
+
+                <p class="auth-footer">
+                    Don't have an account? <a href="signup-student.html">Sign up</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        document.querySelector('.toggle-password').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const icon = this.querySelector('i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+
+        // Form submission
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Form submission started');
+            
+            try {
+                // Get form values
+                const studentId = document.getElementById('studentId').value.trim();
+                const password = document.getElementById('password').value;
+                
+                console.log('Student ID:', studentId);
+                
+                // Basic validation
+                if (!studentId || !password) {
+                    const errorMsg = 'Please fill in all fields';
+                    console.error(errorMsg);
+                    alert(errorMsg);
+                    return;
+                }
+                
+                // In a real app, you would validate credentials with a server here
+                console.log('Simulating successful login...');
+                
+                // Store login state (for demo purposes)
+                localStorage.setItem('studentLoggedIn', 'true');
+                localStorage.setItem('studentId', studentId);
+                
+                console.log('Login state saved to localStorage');
+                console.log('Attempting to redirect to student dashboard...');
+                
+                // Add a small delay to ensure localStorage is updated
+                setTimeout(() => {
+                    const redirectUrl = 'student-dashboard.html?studentId=' + encodeURIComponent(studentId);
+                    console.log('Redirecting to:', redirectUrl);
+                    window.location.href = redirectUrl;
+                }, 100);
+            } catch (error) {
+                console.error('Error during form submission:', error);
+                alert('An error occurred during form submission. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>

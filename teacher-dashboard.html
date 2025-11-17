@@ -318,6 +318,40 @@
         </main>
     </div>
 
+    <script>
+        // Check if teacher is logged in
+        document.addEventListener('DOMContentLoaded', function() {
+            const isLoggedIn = localStorage.getItem('teacherLoggedIn') === 'true';
+            const teacherEmail = localStorage.getItem('teacherEmail');
+            
+            if (!isLoggedIn || !teacherEmail) {
+                // Redirect to login if not logged in
+                window.location.href = 'login-teacher.html';
+                return;
+            }
+            
+            // Display teacher's email in the header
+            const teacherName = teacherEmail.split('@')[0];
+            const teacherNameElement = document.getElementById('teacher-name');
+            if (teacherNameElement) {
+                teacherNameElement.textContent = `Welcome, ${teacherName}`;
+            }
+            
+            // Initialize any dashboard functionality
+            console.log('Teacher dashboard initialized for:', teacherEmail);
+        });
+        
+        // Logout function
+        function logout() {
+            // Clear login state
+            localStorage.removeItem('teacherLoggedIn');
+            localStorage.removeItem('teacherEmail');
+            
+            // Redirect to login page
+            window.location.href = 'login-teacher.html';
+        }
+    </script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.7.107/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="exam-connector.js"></script>

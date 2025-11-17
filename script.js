@@ -10,6 +10,146 @@ document.addEventListener('DOMContentLoaded', function() {
     announcePageLoad();
 });
 
+// Simple toast helper
+function showToast(message, variant = 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    if (variant === 'error') toast.style.background = '#991b1b';
+    if (variant === 'success') toast.style.background = '#065f46';
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'opacity .2s ease, transform .2s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 250);
+    }, 2200);
+}
+
+// Inline Sign Up toggles
+function showInlineSignup(userType) {
+    // Hide any login forms and two-panel cards
+    document.querySelectorAll('.login-form').forEach(f => f.classList.add('hidden'));
+    const authCard = document.getElementById('auth-signup');
+    if (authCard) authCard.classList.add('hidden');
+
+    // Ensure the options grid is visible
+    const options = document.querySelector('.login-options');
+    if (options) options.style.display = 'grid';
+
+    // Hide both inline containers first
+    const tInline = document.getElementById('teacher-inline-signup');
+    const sInline = document.getElementById('student-inline-signup');
+    if (tInline) tInline.classList.add('hidden');
+    if (sInline) sInline.classList.add('hidden');
+
+    const target = userType === 'teacher' ? tInline : sInline;
+    if (target) {
+        target.classList.remove('hidden');
+        const first = target.querySelector('input');
+        setTimeout(() => first && first.focus(), 50);
+        speak(`Create your ${userType} account`);
+    }
+}
+
+function cancelInlineSignup(userType) {
+    const el = document.getElementById(userType === 'teacher' ? 'teacher-inline-signup' : 'student-inline-signup');
+    if (el) el.classList.add('hidden');
+}
+
+// Inline handlers reuse same validation rules
+function handleTeacherSignupInline() {
+    const nameEl = document.getElementById('t2-name');
+    const emailEl = document.getElementById('t2-email');
+    const passEl = document.getElementById('t2-password');
+    const confirmEl = document.getElementById('t2-confirm');
+    const termsEl = document.getElementById('t2-terms');
+    const name = (nameEl?.value || '').trim();
+    const email = (emailEl?.value || '').trim();
+    const password = (passEl?.value || '');
+
+    [nameEl, emailEl, passEl, confirmEl].forEach(el => el && el.setCustomValidity(''));
+    if (!name || !email || !password) {
+        showToast('Please complete all required fields.', 'error');
+        (nameEl && !name) ? nameEl.reportValidity() : (emailEl && !email) ? emailEl.reportValidity() : passEl?.reportValidity();
+        return;
+    }
+    if (password.length < 8) {
+        passEl.setCustomValidity('Password must be at least 8 characters.');
+        passEl.reportValidity();
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+    }
+    if ((confirmEl?.value || '') !== password) {
+        confirmEl.setCustomValidity('Passwords do not match.');
+        confirmEl.reportValidity();
+        showToast('Passwords do not match.', 'error');
+        return;
+    }
+    if (!(termsEl?.checked)) {
+        showToast('Please accept the Terms and Privacy Policy.', 'error');
+        return;
+    }
+
+    currentUser = {
+        type: 'teacher',
+        id: 'T_' + btoa(email).replace(/=+/g, ''),
+        email,
+        name,
+        department: ''
+    };
+    storeUserData(currentUser);
+    speak('Teacher account created. Redirecting to dashboard.');
+    showToast('Teacher account created!', 'success');
+    setTimeout(() => { window.location.href = 'teacher-dashboard.html'; }, 800);
+}
+
+function handleStudentSignupInline() {
+    const nameEl = document.getElementById('s2-name');
+    const emailEl = document.getElementById('s2-email');
+    const passEl = document.getElementById('s2-password');
+    const confirmEl = document.getElementById('s2-confirm');
+    const termsEl = document.getElementById('s2-terms');
+    const name = (nameEl?.value || '').trim();
+    const email = (emailEl?.value || '').trim();
+    const password = (passEl?.value || '');
+
+    [nameEl, emailEl, passEl, confirmEl].forEach(el => el && el.setCustomValidity(''));
+    if (!name || !email || !password) {
+        showToast('Please complete all required fields.', 'error');
+        (nameEl && !name) ? nameEl.reportValidity() : (emailEl && !email) ? emailEl.reportValidity() : passEl?.reportValidity();
+        return;
+    }
+    if (password.length < 8) {
+        passEl.setCustomValidity('Password must be at least 8 characters.');
+        passEl.reportValidity();
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+    }
+    if ((confirmEl?.value || '') !== password) {
+        confirmEl.setCustomValidity('Passwords do not match.');
+        confirmEl.reportValidity();
+        showToast('Passwords do not match.', 'error');
+        return;
+    }
+    if (!(termsEl?.checked)) {
+        showToast('Please accept the Terms and Privacy Policy.', 'error');
+        return;
+    }
+
+    currentUser = {
+        type: 'student',
+        id: 'S_' + btoa(email).replace(/=+/g, ''),
+        email,
+        name,
+        class: ''
+    };
+    storeUserData(currentUser);
+    speak('Student account created. Redirecting to dashboard.');
+    showToast('Student account created!', 'success');
+    setTimeout(() => { window.location.href = 'student-dashboard.html'; }, 800);
+}
+
 // Initialize speech recognition for accessibility
 function initializeSpeechRecognition() {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -21,19 +161,140 @@ function initializeSpeechRecognition() {
     }
 }
 
+// Handle Teacher Sign Up
+function handleTeacherSignup() {
+    const nameEl = document.getElementById('t-name');
+    const emailEl = document.getElementById('t-email');
+    const passEl = document.getElementById('t-password');
+    const confirmEl = document.getElementById('t-confirm');
+    const termsEl = document.getElementById('t-terms');
+    const name = (nameEl?.value || '').trim();
+    const email = (emailEl?.value || '').trim();
+    const password = (passEl?.value || '');
+
+    // Clear previous validity
+    [nameEl, emailEl, passEl, confirmEl].forEach(el => el && el.setCustomValidity(''));
+    // Basic required
+    if (!name || !email || !password) {
+        showToast('Please complete all required fields.', 'error');
+        (nameEl && !name) ? nameEl.reportValidity() : (emailEl && !email) ? emailEl.reportValidity() : passEl?.reportValidity();
+        return;
+    }
+    // Password length
+    if (password.length < 8) {
+        passEl.setCustomValidity('Password must be at least 8 characters.');
+        passEl.reportValidity();
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+    }
+    // Confirm match
+    if ((confirmEl?.value || '') !== password) {
+        confirmEl.setCustomValidity('Passwords do not match.');
+        confirmEl.reportValidity();
+        showToast('Passwords do not match.', 'error');
+        return;
+    }
+    // Terms required
+    if (termsEl && !termsEl.checked) {
+        showToast('Please accept the Terms and Privacy Policy.', 'error');
+        return;
+    }
+
+    currentUser = {
+        type: 'teacher',
+        id: 'T_' + btoa(email).replace(/=+/g, ''),
+        email,
+        name
+    };
+    storeUserData(currentUser);
+    speak('Teacher account created. Redirecting to dashboard.');
+    showToast('Teacher account created!', 'success');
+    setTimeout(() => { window.location.href = 'teacher-dashboard.html'; }, 800);
+}
+
+// Handle Student Sign Up
+function handleStudentSignup() {
+    const nameEl = document.getElementById('s-name');
+    const emailEl = document.getElementById('s-email');
+    const passEl = document.getElementById('s-password');
+    const confirmEl = document.getElementById('s-confirm');
+    const termsEl = document.getElementById('s-terms');
+    const name = (nameEl?.value || '').trim();
+    const email = (emailEl?.value || '').trim();
+    const password = (passEl?.value || '');
+    const sclass = (document.getElementById('s-class')?.value || '').trim();
+
+    [nameEl, emailEl, passEl, confirmEl].forEach(el => el && el.setCustomValidity(''));
+    if (!name || !email || !password) {
+        showToast('Please complete all required fields.', 'error');
+        (nameEl && !name) ? nameEl.reportValidity() : (emailEl && !email) ? emailEl.reportValidity() : passEl?.reportValidity();
+        return;
+    }
+    if (password.length < 8) {
+        passEl.setCustomValidity('Password must be at least 8 characters.');
+        passEl.reportValidity();
+        showToast('Password must be at least 8 characters.', 'error');
+        return;
+    }
+    if ((confirmEl?.value || '') !== password) {
+        confirmEl.setCustomValidity('Passwords do not match.');
+        confirmEl.reportValidity();
+        showToast('Passwords do not match.', 'error');
+        return;
+    }
+    if (!(termsEl?.checked)) {
+        showToast('Please accept the Terms and Privacy Policy.', 'error');
+        return;
+    }
+
+    currentUser = {
+        type: 'student',
+        id: 'S_' + btoa(email).replace(/=+/g, ''),
+        email,
+        name,
+        class: sclass
+    };
+    storeUserData(currentUser);
+    speak('Student account created. Redirecting to dashboard.');
+    showToast('Student account created!', 'success');
+    setTimeout(() => { window.location.href = 'student-dashboard.html'; }, 800);
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Teacher form submission
-    document.getElementById('teacher-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleTeacherLogin();
-    });
+    const teacherForm = document.getElementById('teacher-form');
+    if (teacherForm) {
+        teacherForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleTeacherLogin();
+        });
+    }
 
     // Student form submission
-    document.getElementById('student-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleStudentLogin();
-    });
+    const studentForm = document.getElementById('student-form');
+    if (studentForm) {
+        studentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleStudentLogin();
+        });
+    }
+
+    // Sign Up form submission (if present)
+    const teacherSignupEl = document.getElementById('teacher-signup-form');
+    if (teacherSignupEl) {
+        teacherSignupEl.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleTeacherSignup();
+        });
+    }
+    const studentSignupEl = document.getElementById('student-signup-form');
+    if (studentSignupEl) {
+        studentSignupEl.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleStudentSignup();
+        });
+    }
 
 
     // Keyboard navigation
@@ -50,6 +311,9 @@ function showLogin(userType) {
     document.querySelectorAll('.login-form').forEach(form => {
         form.classList.add('hidden');
     });
+    // Hide auth card if visible
+    const authCard = document.getElementById('auth-signup');
+    if (authCard) authCard.classList.add('hidden');
     
     // Hide login options
     document.querySelector('.login-options').style.display = 'none';
@@ -74,11 +338,37 @@ function hideLogin() {
     document.querySelectorAll('.login-form').forEach(form => {
         form.classList.add('hidden');
     });
+    const authCard = document.getElementById('auth-signup');
+    if (authCard) authCard.classList.add('hidden');
     
     document.querySelector('.login-options').style.display = 'grid';
     
     // Announce to screen readers
     speak('Returned to login options');
+}
+
+// Show the Sign Up form
+function showSignup(userType) {
+    // Hide all login forms
+    document.querySelectorAll('.login-form').forEach(form => {
+        form.classList.add('hidden');
+    });
+    // Hide login options
+    const options = document.querySelector('.login-options');
+    if (options) options.style.display = 'none';
+    // Hide the two-panel card if present
+    const authCard = document.getElementById('auth-signup');
+    if (authCard) authCard.classList.add('hidden');
+    // Show role-specific form
+    const targetId = userType === 'teacher' ? 'teacher-signup' : 'student-signup';
+    const form = document.getElementById(targetId);
+    if (form) form.classList.remove('hidden');
+    // Focus first input of the shown form
+    setTimeout(() => {
+        const firstInput = form ? form.querySelector('input, select') : null;
+        if (firstInput) firstInput.focus();
+    }, 100);
+    speak(`Create your ${userType || 'student'} account by filling the sign up form`);
 }
 
 // Handle teacher login
